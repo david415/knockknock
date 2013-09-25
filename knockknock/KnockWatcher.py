@@ -19,7 +19,7 @@
 import syslog
 
 from LogEntry import LogEntry
-from MacFailedException import MacFailedException
+from nacl.exceptions import CryptoError
 
 class KnockWatcher:
 
@@ -38,12 +38,12 @@ class KnockWatcher:
                 if (profile != None):
                     try:
                         ciphertext = logEntry.getEncryptedData()
-                        port       = profile.decrypt(ciphertext, self.config.getWindow())
+                        port       = profile.decrypt(ciphertext)
                         sourceIP   = logEntry.getSourceIP()
                     
                         self.portOpener.open(sourceIP, port)
                         syslog.syslog("Received authenticated port-knock for port " + str(port) + " from " + sourceIP)
-                    except MacFailedException:
+                    except CryptoError:
                         pass
             except:
 #                print "Unexpected error:", sys.exc_info()

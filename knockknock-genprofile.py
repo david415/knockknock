@@ -25,6 +25,8 @@ USA
 import os, sys
 from knockknock.Profiles import Profiles
 from knockknock.Profile  import Profile
+import nacl.utils
+import nacl.secret
 
 DAEMON_DIR   = '/etc/knockknock.d/'
 PROFILES_DIR = DAEMON_DIR + 'profiles/'
@@ -70,12 +72,10 @@ def main(argv):
     checkPortConflict(knockPort)
     createDirectory(profileName)
 
-    random    = open('/dev/urandom', 'rb')
-    cipherKey = random.read(16)
-    macKey    = random.read(16)
-    counter   = 0
 
-    profile = Profile(PROFILES_DIR + profileName, cipherKey, macKey, counter, knockPort)
+    cipherKey = nacl.utils.random(nacl.secret.SecretBox.KEY_SIZE)
+
+    profile = Profile(PROFILES_DIR + profileName, cipherKey, knockPort)
     profile.serialize()
     random.close()
 

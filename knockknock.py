@@ -24,6 +24,8 @@ USA
 import time, os, sys
 import getopt
 import subprocess
+import nacl.secret
+import nacl.utils
 
 from struct import *
 from knockknock.Profile import Profile
@@ -92,7 +94,11 @@ def main(argv):
     
     profile      = getProfile(host)
     port         = pack('!H', int(port))
-    packetData   = profile.encrypt(port)
+
+    # BUG: maybe we should just increment instead of prng...
+    # what the probability of a colition?
+    nonce        = nacl.utils.random(nacl.secret.SecretBox.NONCE_SIZE)
+    packetData   = profile.encrypt(port, nonce)
     knockPort    = profile.getKnockPort()
     
     (idField, seqField, ackField, winField) = unpack('!HIIH', packetData)

@@ -21,13 +21,12 @@ import ConfigParser
 import binascii
 import stat
 from struct import *
+import nacl.secret
 
-from CryptoEngine import CryptoEngine
 
 class Profile:
 
-    def __init__(self, directory, cipherKey=None, macKey=None, counter=None, knockPort=None):
-        self.counterFile  = None
+    def __init__(self, directory, cipherKey=None, knockPort=None):
         self.directory    = directory
         self.name         = directory.rstrip('/').split('/')[-1]
 
@@ -35,22 +34,16 @@ class Profile:
             self.deserialize()
         else:
             self.cipherKey = cipherKey
-            self.macKey    = macKey
-            self.counter   = counter
             self.knockPort = knockPort
 
-        self.cryptoEngine = CryptoEngine(self, self.cipherKey, self.macKey, self.counter)
+        self.box = nacl.secret.SecretBox(self.cipherKey)
 
     def deserialize(self):
         self.cipherKey    = self.loadCipherKey()
-        self.macKey       = self.loadMacKey()
-        self.counter      = self.loadCounter()
         self.knockPort    = self.loadConfig()
 
     def serialize(self):
         self.storeCipherKey()
-        self.storeMacKey()
-        self.storeCounter()
         self.storeConfig()
 
     # Getters And Setters
@@ -70,34 +63,18 @@ class Profile:
     def getKnockPort(self):
         return self.knockPort
 
-    def setCounter(self, counter):
-        self.counter = counter
-
     # Encrypt And Decrypt
 
-    def decrypt(self, ciphertext, windowSize):
-        return self.cryptoEngine.decrypt(ciphertext, windowSize)
+    def decrypt(self, ciphertext):
+        return self.box.decrypt(ciphertext)
 
-    def encrypt(self, plaintext):
-        return self.cryptoEngine.encrypt(plaintext)
+    def encrypt(self, plaintext, nonce):
+        return self.box.encrypt(plaintext, nonce)
 
     # Serialization Methods
 
     def loadCipherKey(self):
         return self.loadKey(self.directory + "/cipher.key")
-
-    def loadMacKey(self):
-        return self.loadKey(self.directory + "/mac.key")
-
-    def loadCounter(self):
-        # Privsep bullshit...
-        if (self.counterFile == None):
-            self.counterFile = open(self.directory + "/counter", 'r+')
-
-        counter = self.counterFile.readline()
-        counter = counter.rstrip("\n")
-
-        return int(counter)
 
     def loadConfig(self):
         config = ConfigParser.SafeConfigParser()
@@ -114,19 +91,6 @@ class Profile:
 
     def storeCipherKey(self):        
         self.storeKey(self.cipherKey, self.directory + "/cipher.key")
-
-    def storeMacKey(self):
-        self.storeKey(self.macKey, self.directory + "/mac.key")
-
-    def storeCounter(self):
-        # Privsep bullshit...
-        if (self.counterFile == None):
-            self.counterFile = open(self.directory + '/counter', 'w')
-            self.setPermissions(self.directory + '/counter')
-
-        self.counterFile.seek(0)
-        self.counterFile.write(str(self.counter) + "\n")
-        self.counterFile.flush()
 
     def storeConfig(self):
         config = ConfigParser.SafeConfigParser()
