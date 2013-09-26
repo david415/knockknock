@@ -104,9 +104,6 @@ def main(argv):
     print "len(packetData): %s" % len(packetData)
     
 
-    # use scapy to send the packet?
-
-
     (idField, seqField, ackField, winField) = unpack('!HIIH', packetData)
 
     hping = existsInPath("hping3")

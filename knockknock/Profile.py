@@ -98,10 +98,10 @@ class Profile:
     def decrypt(self, ciphertext):
         """Decrypt data only if nonce was used once."""
 
-        counter_b  = ciphertext[:nacl.secret.nacl.lib.crypto_secretbox_NONCEBYTES]
-        counter, l2, l3 = unpack("LLL", counter_b)
+        nonce  = ciphertext[:nacl.secret.nacl.lib.crypto_secretbox_NONCEBYTES]
+        counter, l2, l3 = unpack("LLL", nonce)
 
-        last_counter = self.load_counter()
+        last_counter = self.loadCounter()
 
         if counter <= last_counter:
             raise NonceRepeatedException, "current counter equal or less than last counter"
@@ -109,7 +109,8 @@ class Profile:
 
 
     def encrypt(self, plaintext, counter):
-        return self.box.encrypt(plaintext, counter)
+        nonce = pack('LLL',counter,0,0)
+        return self.box.encrypt(plaintext, nonce)
 
     # Serialization Methods
 
