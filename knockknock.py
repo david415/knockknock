@@ -110,6 +110,7 @@ def main(argv):
                "-M", str(seqField),
                "-L", str(ackField),
                host]
+    print "command:\n%s" % " ".join(command)
     
     try:
         subprocess.call(command, shell=False, stdout=open('/dev/null', 'w'), stderr=subprocess.STDOUT)
