@@ -37,18 +37,13 @@ class Profile:
         else:
             self.cipherKey = cipherKey
             self.knockPort = knockPort
-
-            self.counter   = pack("LLL", 0, 0, 0)
-            print "counter len %s" % len(self.counter)
-            
-
+            self.counter   = 0
 
         self.box = nacl.secret.SecretBox(self.cipherKey)
 
     def deserialize(self):
         self.cipherKey    = self.loadCipherKey()
         self.knockPort    = self.loadConfig()
-        self.counter      = self.loadCounter()
 
     def serialize(self):
         self.storeCipherKey()
@@ -88,8 +83,11 @@ class Profile:
         if (self.counterFile == None):
             self.counterFile = open(self.directory + "/counter", 'r+')
 
-        counter = self.counterFile.readline()
-        counter = counter.rstrip("\n")
+        line = self.counterFile.readline()
+        print "line %s" % line
+        counter = line.rstrip("\n")
+        print "counter %s" % counter
+
 
         return int(counter)
 

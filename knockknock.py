@@ -95,14 +95,17 @@ def main(argv):
     profile      = getProfile(host)
     port         = pack('!H', int(port))
 
-    counter      = profile.load_counter()
-    counter      += 1
+    counter      = profile.loadCounter()
+    counter      = counter + 1
     packetData   = profile.encrypt(port, counter)
     knockPort    = profile.getKnockPort()
     
 
     print "len(packetData): %s" % len(packetData)
     
+    # use scapy to send data in syn packet
+    sr1(IP(dst=host)/TCP(dport=port,flags="S"))
+
 
     (idField, seqField, ackField, winField) = unpack('!HIIH', packetData)
 
