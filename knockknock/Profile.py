@@ -22,11 +22,13 @@ import binascii
 import stat
 from struct import *
 import nacl.secret
-
+import binascii
 
 class Profile:
 
     def __init__(self, directory, cipherKey=None, knockPort=None):
+        self.counterFile  = None
+        self.counter      = None
         self.directory    = directory
         self.name         = directory.rstrip('/').split('/')[-1]
 
@@ -36,15 +38,22 @@ class Profile:
             self.cipherKey = cipherKey
             self.knockPort = knockPort
 
+            self.counter   = pack("LLL", 0, 0, 0)
+            print "counter len %s" % len(self.counter)
+            
+
+
         self.box = nacl.secret.SecretBox(self.cipherKey)
 
     def deserialize(self):
         self.cipherKey    = self.loadCipherKey()
         self.knockPort    = self.loadConfig()
+        self.counter      = self.loadCounter()
 
     def serialize(self):
         self.storeCipherKey()
         self.storeConfig()
+        self.storeCounter()
 
     # Getters And Setters
 
@@ -63,13 +72,44 @@ class Profile:
     def getKnockPort(self):
         return self.knockPort
 
+    def storeCounter(self):
+        # Privsep bullshit...
+        if (self.counterFile == None):
+            self.counterFile = open(self.directory + '/counter', 'w')
+            self.setPermissions(self.directory + '/counter')
+
+        self.counterFile.seek(0)
+        self.counterFile.write(str(self.counter) + "\n")
+        self.counterFile.flush()
+
+
+    def loadCounter(self):
+        # Privsep bullshit...
+        if (self.counterFile == None):
+            self.counterFile = open(self.directory + "/counter", 'r+')
+
+        counter = self.counterFile.readline()
+        counter = counter.rstrip("\n")
+
+        return int(counter)
+
     # Encrypt And Decrypt
 
     def decrypt(self, ciphertext):
+        """Decrypt data only if nonce was used once."""
+
+        counter_b  = ciphertext[:nacl.secret.nacl.lib.crypto_secretbox_NONCEBYTES]
+        counter, l2, l3 = unpack("LLL", counter_b)
+
+        last_counter = self.load_counter()
+
+        if counter <= last_counter:
+            raise NonceRepeatedException, "current counter equal or less than last counter"
         return self.box.decrypt(ciphertext)
 
-    def encrypt(self, plaintext, nonce):
-        return self.box.encrypt(plaintext, nonce)
+
+    def encrypt(self, plaintext, counter):
+        return self.box.encrypt(plaintext, counter)
 
     # Serialization Methods
 

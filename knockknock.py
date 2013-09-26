@@ -95,12 +95,18 @@ def main(argv):
     profile      = getProfile(host)
     port         = pack('!H', int(port))
 
-    # BUG: maybe we should just increment instead of prng...
-    # what the probability of a colition?
-    nonce        = nacl.utils.random(nacl.secret.SecretBox.NONCE_SIZE)
-    packetData   = profile.encrypt(port, nonce)
+    counter      = profile.load_counter()
+    counter      += 1
+    packetData   = profile.encrypt(port, counter)
     knockPort    = profile.getKnockPort()
     
+
+    print "len(packetData): %s" % len(packetData)
+    
+
+    # use scapy to send the packet?
+
+
     (idField, seqField, ackField, winField) = unpack('!HIIH', packetData)
 
     hping = existsInPath("hping3")
@@ -117,6 +123,8 @@ def main(argv):
                "-L", str(ackField),
                host]
     
+    print "command:\n%s" % " ".join(command)
+
     try:
         subprocess.call(command, shell=False, stdout=open('/dev/null', 'w'), stderr=subprocess.STDOUT)
         print 'Knock sent.'

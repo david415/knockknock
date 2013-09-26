@@ -77,7 +77,6 @@ def main(argv):
 
     profile = Profile(PROFILES_DIR + profileName, cipherKey, knockPort)
     profile.serialize()
-    random.close()
 
     print "Keys successfully generated in " + PROFILES_DIR + profileName
 
