@@ -16,10 +16,15 @@
 # USA
 #
 
-import syslog
-
+# Internal modules
 from LogEntry import LogEntry
-from nacl.exceptions import CryptoError
+
+# External modules
+import syslog
+import struct
+import sys
+import traceback
+
 
 class KnockWatcher:
 
@@ -29,22 +34,16 @@ class KnockWatcher:
         self.profiles   = profiles
         self.portOpener = portOpener
 
+
     def tailAndProcess(self):
         for line in self.logFile.tail():
-            try:
-                logEntry = LogEntry(line)
-                profile  = self.profiles.getProfileForPort(logEntry.getDestinationPort())
-
-                if (profile != None):
-                    try:
-                        ciphertext = logEntry.getEncryptedData()
-                        port       = profile.decrypt(ciphertext)
-                        sourceIP   = logEntry.getSourceIP()
-                    
-                        self.portOpener.open(sourceIP, port)
-                        syslog.syslog("Received authenticated port-knock for port " + str(port) + " from " + sourceIP)
-                    except CryptoError:
-                        pass
-            except:
-#                print "Unexpected error:", sys.exc_info()
-                syslog.syslog("knocknock skipping unrecognized line.")
+            logEntry = LogEntry(line)
+            profile  = self.profiles.getProfileForPort(logEntry.getDestinationPort())
+                
+            if profile is not None:
+                ciphertext = logEntry.getEncryptedData()
+                sourceIP   = logEntry.getSourceIP()
+                port       = profile.decrypt(ciphertext)
+                if port is not None:
+                    syslog.syslog("Received authenticated port-knock for port " + str(port) + " from " + sourceIP)
+                    self.portOpener.open(sourceIP, port)

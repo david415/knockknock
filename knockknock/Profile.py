@@ -23,12 +23,13 @@ import stat
 from struct import *
 import nacl.secret
 import binascii
+from scapy.all import hexdump
+from nacl.exceptions import CryptoError
 
 class Profile:
 
     def __init__(self, directory, cipherKey=None, knockPort=None):
         self.counterFile  = None
-        self.counter      = None
         self.directory    = directory
         self.name         = directory.rstrip('/').split('/')[-1]
 
@@ -37,7 +38,6 @@ class Profile:
         else:
             self.cipherKey = cipherKey
             self.knockPort = knockPort
-            self.counter   = 0
 
         self.box = nacl.secret.SecretBox(self.cipherKey)
 
@@ -67,47 +67,47 @@ class Profile:
     def getKnockPort(self):
         return self.knockPort
 
-    def storeCounter(self):
-        # Privsep bullshit...
-        if (self.counterFile == None):
-            self.counterFile = open(self.directory + '/counter', 'w')
-            self.setPermissions(self.directory + '/counter')
+    def storeCounter(self, counter):
+        counterFile = open(self.directory + '/counter', 'w')
+        self.setPermissions(self.directory + '/counter')
 
-        self.counterFile.seek(0)
-        self.counterFile.write(str(self.counter) + "\n")
-        self.counterFile.flush()
-
+        counterFile.seek(0)
+        counterFile.write(str(counter) + "\n")
+        counterFile.flush()
+        counterFile.close()
 
     def loadCounter(self):
         # Privsep bullshit...
-        if (self.counterFile == None):
-            self.counterFile = open(self.directory + "/counter", 'r+')
-
-        line = self.counterFile.readline()
-        print "line %s" % line
+        counterFile = open(self.directory + "/counter", 'r+')
+        line = counterFile.readline()
         counter = line.rstrip("\n")
-        print "counter %s" % counter
-
-
+        counterFile.close()
         return int(counter)
 
     # Encrypt And Decrypt
 
     def decrypt(self, ciphertext):
-        """Decrypt data only if nonce was used once."""
+        """Load counter, increment, use it as a nonce decrypt data and store counter."""
 
-        nonce  = ciphertext[:nacl.secret.nacl.lib.crypto_secretbox_NONCEBYTES]
-        counter, l2, l3 = unpack("LLL", nonce)
+        counter = self.loadCounter()
+        counter += 1
+        nonce = pack('LLL', 0, 0, counter)
 
-        last_counter = self.loadCounter()
+        try:
+            plaintext = self.box.decrypt(ciphertext, nonce)
+        except CryptoError:
+            # failed to decrypt
+            return None
 
-        if counter <= last_counter:
-            raise NonceRepeatedException, "current counter equal or less than last counter"
-        return self.box.decrypt(ciphertext)
+        port = unpack('H', plaintext)
+        port = port[0]
+
+        self.storeCounter(counter)
+
+        return port
 
 
-    def encrypt(self, plaintext, counter):
-        nonce = pack('LLL',counter,0,0)
+    def encrypt(self, plaintext, nonce):
         return self.box.encrypt(plaintext, nonce)
 
     # Serialization Methods

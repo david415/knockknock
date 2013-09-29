@@ -19,6 +19,8 @@
 import subprocess
 import time
 import threading
+import syslog
+
 
 class RuleTimer(threading.Thread):
 
@@ -30,6 +32,7 @@ class RuleTimer(threading.Thread):
     def run(self):
         time.sleep(self.openDuration)
         command = 'iptables -D ' + self.description
+        syslog.syslog("issuing command: " + command)
         command = command.split()
 
         subprocess.call(command, shell=False)

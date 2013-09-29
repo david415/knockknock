@@ -18,7 +18,7 @@
 
 import os, syslog, time
 import subprocess
-
+import syslog
 from RuleTimer import RuleTimer
 
 class PortOpener:
@@ -38,10 +38,11 @@ class PortOpener:
 
             description = 'INPUT -m limit --limit 1/minute --limit-burst 1 -m state --state NEW -p tcp -s ' + sourceIP + ' --dport ' + str(port) + ' -j ACCEPT'
             command     = 'iptables -I ' + description
+
+            syslog.syslog("issuing command: " + command)
+
             command     = command.split()            
-
             subprocess.call(command, shell=False)
-
             RuleTimer(self.openDuration, description).start()
 
     def open(self, sourceIP, port):

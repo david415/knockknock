@@ -18,13 +18,14 @@
 
 import string
 from struct import *
+import binascii
+import syslog
 
 
 class LogEntry:
 
     def __init__(self, line):
         self.buildTokenMap(line)
-
 
     def buildTokenMap(self, line):
         self.tokenMap = dict()
@@ -35,11 +36,29 @@ class LogEntry:
                 exploded = token.split('=')
                 self.tokenMap[exploded[0]] = exploded[1]
 
+        if 'OPT' in line:
+            opt = line.split('OPT ')[1]
+            if opt.startswith('('):
+                opt = opt[1:-1] # remove parenthesis
+                opt = opt[4:16] # grab 12 chars
+                opt = binascii.unhexlify(opt)
+                self.tokenMap['OPT'] = opt
+
     def getDestinationPort(self):
-        return int(self.tokenMap['DPT'])
+        if self.tokenMap.has_key('DPT'):
+            return int(self.tokenMap['DPT'])
+        else:
+            return None
 
     def getEncryptedData(self):
-        return pack('!HIIH', int(self.tokenMap['ID']), int(self.tokenMap['SEQ']), int(self.tokenMap['ACK']), int(self.tokenMap['WINDOW']))
-                    
+        expected_tokens = set(['ID', 'SEQ', 'ACK', 'WINDOW','OPT'])
+
+        if len(expected_tokens - set(self.tokenMap.keys())) != 0:
+            syslog.syslog("did not find all expected TCP header fields: %s" % self.tokenMap.keys())
+            return None
+
+        ciphertext = pack('!HIIH', int(self.tokenMap['ID']), int(self.tokenMap['SEQ']), int(self.tokenMap['ACK']), int(self.tokenMap['WINDOW'])) + self.tokenMap['OPT']
+        return ciphertext
+
     def getSourceIP(self):
         return self.tokenMap['SRC']

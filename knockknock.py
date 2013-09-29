@@ -26,9 +26,13 @@ import getopt
 import subprocess
 import nacl.secret
 import nacl.utils
-
+from scapy.all import send, IP, TCP, hexdump
 from struct import *
+
 from knockknock.Profile import Profile
+
+
+
 
 def usage():
     print "Usage: knockknock.py -p <portToOpen> <host>"
@@ -93,45 +97,37 @@ def main(argv):
     verifyPermissions()
     
     profile      = getProfile(host)
-    port         = pack('!H', int(port))
+    port         = pack('H', int(port))
 
     counter      = profile.loadCounter()
     counter      = counter + 1
-    packetData   = profile.encrypt(port, counter)
+
+
+
+    nonce = pack('LLL', 0,0,counter)
+
+    ciphertext   = profile.encrypt(port, nonce)
     knockPort    = profile.getKnockPort()
     
 
-    print "len(packetData): %s" % len(packetData)
-    
-    # use scapy to send data in syn packet
-    sr1(IP(dst=host)/TCP(dport=port,flags="S"))
+    packetData = ciphertext[nacl.secret.nacl.lib.crypto_secretbox_NONCEBYTES:]
 
+    # use scapy to send data in syn packet header
 
-    (idField, seqField, ackField, winField) = unpack('!HIIH', packetData)
+    (idField, seqField, ackField, winField, opt1, opt2, opt3, opt4, opt5, opt6) = unpack('!HIIHcccccc', packetData)
 
-    hping = existsInPath("hping3")
+    hexdump(packetData)
 
-    if hping is None:
-        print "Error, you must install hping3 first."
-        sys.exit(2)
+    tcp = TCP(dport=int(knockPort), flags='S', seq=seqField, ack=ackField, window=winField, options=[('MSS', pack('cccccc', opt1, opt2, opt3, opt4, opt5, opt6))] )
+    ip = IP(dst=host, id=idField)
 
-    command = [hping, "-S", "-c", "1",
-               "-p", str(knockPort),
-               "-N", str(idField),
-               "-w", str(winField),
-               "-M", str(seqField),
-               "-L", str(ackField),
-               host]
-    
-    print "command:\n%s" % " ".join(command)
+    ip.show()
+    tcp.show()
 
-    try:
-        subprocess.call(command, shell=False, stdout=open('/dev/null', 'w'), stderr=subprocess.STDOUT)
-        print 'Knock sent.'
+    send(ip/tcp)
 
-    except OSError:
-        print "Error: Do you have hping3 installed?"
-        sys.exit(3)
+    profile.storeCounter(counter)
+
 
 if __name__ == '__main__':
     main(sys.argv[1:])

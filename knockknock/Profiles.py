@@ -29,9 +29,10 @@ class Profiles:
                 self.profiles.append(Profile(os.path.join(directory, item)))
 
     def getProfileForPort(self, port):
-        for profile in self.profiles:
-            if (int(profile.getKnockPort()) == int(port)):
-                return profile
+        if port is not None:
+            for profile in self.profiles:
+                if (int(profile.getKnockPort()) == int(port)):
+                    return profile
 
         return None
 
