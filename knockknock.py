@@ -97,20 +97,15 @@ def main(argv):
     verifyPermissions()
     
     profile      = getProfile(host)
-    port         = pack('H', int(port))
+    knockPort    = profile.getKnockPort()
 
     counter      = profile.loadCounter()
     counter      = counter + 1
+    nonce        = pack('LLL', 0,0,counter)
+    port         = pack('H', int(port))
 
-
-
-    nonce = pack('LLL', 0,0,counter)
-
-    ciphertext   = profile.encrypt(port, nonce)
-    knockPort    = profile.getKnockPort()
-    
-
-    packetData = ciphertext[nacl.secret.nacl.lib.crypto_secretbox_NONCEBYTES:]
+    ciphertext   = profile.encrypt(port, nonce)    
+    packetData   = ciphertext[nacl.secret.nacl.lib.crypto_secretbox_NONCEBYTES:]
 
     # use scapy to send data in syn packet header
 
@@ -118,7 +113,13 @@ def main(argv):
 
     hexdump(packetData)
 
-    tcp = TCP(dport=int(knockPort), flags='S', seq=seqField, ack=ackField, window=winField, options=[('MSS', pack('cccccc', opt1, opt2, opt3, opt4, opt5, opt6))] )
+    tcp = TCP(dport   = int(knockPort), 
+              flags   = 'S',
+              seq     = seqField,
+              ack     = ackField,
+              window  = winField,
+              options = [('MSS', pack('cccccc', opt1, opt2, opt3, opt4, opt5, opt6))] )
+
     ip = IP(dst=host, id=idField)
 
     ip.show()
