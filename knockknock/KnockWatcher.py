@@ -16,14 +16,13 @@
 # USA
 #
 
-# Internal modules
-from LogEntry import LogEntry
-
 # External modules
 import syslog
 import struct
 import sys
 import traceback
+from nflog_cffi import NFLOG
+from scapy.all import *
 
 
 class KnockWatcher:
@@ -34,16 +33,36 @@ class KnockWatcher:
         self.profiles   = profiles
         self.portOpener = portOpener
 
+        self.qids       = 0, 1
+        self.nflog      = NFLOG().generator(qids)
 
-    def tailAndProcess(self):
-        for line in self.logFile.tail():
-            logEntry = LogEntry(line)
-            profile  = self.profiles.getProfileForPort(logEntry.getDestinationPort())
-                
-            if profile is not None:
-                ciphertext = logEntry.getEncryptedData()
-                sourceIP   = logEntry.getSourceIP()
-                port       = profile.decrypt(ciphertext)
-                if port is not None:
-                    syslog.syslog("Received authenticated port-knock for port " + str(port) + " from " + sourceIP)
-                    self.portOpener.open(sourceIP, port)
+    def process_nflog_packets(self):
+        next(self.nflog)
+        for pkt in self.nflog:
+            if pkt is None:
+                continue
+            if TCP not in IP(pkt):
+                continue
+
+            profile  = self.profiles.getProfileForPort(IP(pkt)[TCP].dport)
+            if profile is None:
+                continue
+
+            ciphertext = self.get_ciphertext_from_packet(pkt)
+            port       = profile.decrypt(ciphertext)
+
+            if port is not None:
+                sourceIP = IP(pkt).src
+                syslog.syslog("Received authenticated port-knock for port " + str(port) + " from " + sourceIP)
+                self.portOpener.open(sourceIP, port)
+
+
+    # BUG: finish this!
+    def get_ciphertext_from_packet(self, pkt):
+        pkt = IP(pkt)
+        return pack('!HIIHcccccc', 
+             pkt.id,
+             pkt[TCP].seq,
+             pkt[TCP].ack,
+             pkt[TCP].window,
+             ...)
