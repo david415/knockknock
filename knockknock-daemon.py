@@ -61,13 +61,10 @@ def handleFirewall(input, config):
     portOpener.waitForRequests()
 
 def handleKnocks(output, profiles, config):
-    dropPrivileges()
-    
-    logFile      = LogFile('/var/log/kern.log')
     portOpener   = PortOpener(output, config.getDelay())
-    knockWatcher = KnockWatcher(config, logFile, profiles, portOpener)
+    knockWatcher = KnockWatcher(config, profiles, portOpener)
 
-    knockWatcher.tailAndProcess()
+    knockWatcher.process_nflog_packets()
 
 def main(argv):
     checkPrivileges()

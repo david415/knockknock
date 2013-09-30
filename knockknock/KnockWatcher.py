@@ -27,13 +27,12 @@ from scapy.all import *
 
 class KnockWatcher:
 
-    def __init__(self, config, logFile, profiles, portOpener):
+    def __init__(self, config, profiles, portOpener):
         self.config     = config
-        self.logFile    = logFile
         self.profiles   = profiles
         self.portOpener = portOpener
 
-        self.qids       = 0, 1
+        qids            = 0, 1
         self.nflog      = NFLOG().generator(qids)
 
     def process_nflog_packets(self):
@@ -47,22 +46,20 @@ class KnockWatcher:
             profile  = self.profiles.getProfileForPort(IP(pkt)[TCP].dport)
             if profile is None:
                 continue
-
             ciphertext = self.get_ciphertext_from_packet(pkt)
             port       = profile.decrypt(ciphertext)
-
+            
             if port is not None:
                 sourceIP = IP(pkt).src
                 syslog.syslog("Received authenticated port-knock for port " + str(port) + " from " + sourceIP)
                 self.portOpener.open(sourceIP, port)
 
 
-    # BUG: finish this!
     def get_ciphertext_from_packet(self, pkt):
         pkt = IP(pkt)
-        return pack('!HIIHcccccc', 
+        opt = dict(pkt[TCP].options)['MSS']
+        return struct.pack('!HIIH', 
              pkt.id,
              pkt[TCP].seq,
              pkt[TCP].ack,
-             pkt[TCP].window,
-             ...)
+             pkt[TCP].window) + opt
