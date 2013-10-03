@@ -22,7 +22,7 @@ import struct
 import sys
 import traceback
 from nflog_cffi import NFLOG
-from scapy.all import *
+from scapy.all import IP, TCP
 
 
 class KnockWatcher:
@@ -34,9 +34,10 @@ class KnockWatcher:
 
         qids            = 0, 1
         self.nflog      = NFLOG().generator(qids)
+        next(self.nflog)
+
 
     def process_nflog_packets(self):
-        next(self.nflog)
         for pkt in self.nflog:
             if pkt is None:
                 continue
@@ -57,7 +58,9 @@ class KnockWatcher:
 
     def get_ciphertext_from_packet(self, pkt):
         pkt = IP(pkt)
-        opt = dict(pkt[TCP].options)['MSS']
+        opt = dict(pkt[TCP].options)
+        if opt.has_key('MSS'):
+            opt = opt['MSS']
         return struct.pack('!HIIH', 
              pkt.id,
              pkt[TCP].seq,
